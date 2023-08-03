@@ -1,118 +1,149 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import useDebounce from "@/hooks/useDebounce";
+import { passwordTable } from "@/lib/passwordTable";
+import { classifyString, cn, intToString } from "@/lib/utils";
+import { formatDistance } from "date-fns";
+import { round } from "lodash-es";
+import { Inter } from "next/font/google";
+import { useMemo } from "react";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
+
+const yearInMs = 3.15576e10;
+
+const initTime = new Date(0);
 
 export default function Home() {
+  const [debouncedValue, value, setValue] = useDebounce("", 300);
+
+  const timeInMs: number = useMemo(() => {
+    if (debouncedValue.length < 4) return 0;
+
+    const index = debouncedValue.length >= 18 ? 14 : debouncedValue.length - 4;
+    const finalVal =
+      passwordTable.at(index)?.at(classifyString(debouncedValue)) ?? 0;
+
+    return finalVal;
+  }, [debouncedValue]);
+
+  let timeStr: string | null;
+  if (debouncedValue.length === 0) {
+    timeStr = null;
+  } else if (debouncedValue.length < 4) {
+    timeStr = "0 Seconds. Try making it atleast 3 characters.";
+  } else if (timeInMs === 0) {
+    timeStr = "0 Seconds. Consider it Public at this point...";
+  } else if (timeInMs < yearInMs) {
+    const timeAsDate = new Date(timeInMs);
+    try {
+      timeStr = formatDistance(initTime, timeAsDate, {
+        includeSeconds: true,
+      });
+    } catch (error) {
+      timeStr = "An Error Has Occurred";
+    }
+  } else {
+    timeStr = intToString(round(timeInMs / yearInMs)) + " Years";
+  }
+
+  let statusLvl: number | null;
+  if (debouncedValue.length === 0) {
+    statusLvl = null;
+  } else if (timeInMs === 0) {
+    statusLvl = 0;
+  } else if (timeInMs <= yearInMs) {
+    // If <= 1 Year
+    statusLvl = 1;
+  } else if (timeInMs <= 3.15576e15) {
+    // If <= 100k Years
+    statusLvl = 2;
+  } else if (timeInMs <= 7.889399e20) {
+    // If <= 25bn Years
+    statusLvl = 3;
+  } else {
+    // If > 25bn Years
+    statusLvl = 4;
+  }
+
   return (
     <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
+      className={cn(
+        "flex flex-col justify-center h-screen w-full gap-4 text-white items-center absolute",
+        "bg-gradient-to-br from-[#c31432] to-[#240b36]"
+      )}
     >
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/pages/index.tsx</code>
+      <div className="max-w-2xl space-y-4">
+        <h1 className="text-5xl font-bold">🔒 Password Time Machine</h1>
+        <p className="">
+          A lot of people think their passwords are tough. Enter that password
+          and see how long it would take for someone to brute force your
+          (supposedly good) password.
         </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="bg-background/20 placeholder:text-gray-300 font-password text-lg px-4 h-auto"
+          placeholder="Write your ideal password..."
+          autoComplete="false"
+        />
+        {timeStr !== null && (
+          <Card className="w-full max-w-2xl bg-background/20 text-white animate-in fade-in-0 fade-out-0 slide-in-from-top-5 slide-out-to-bottom-5">
+            <CardHeader>
+              <CardTitle
+                key={timeStr}
+                className="animate-in animate-out fade-in-0 fade-out-0 duration-75 slide-in-from-top-2 slide-out-to-bottom-2"
+              >
+                {timeStr}
+              </CardTitle>
+
+              {statusLvl !== null && (
+                <>
+                  <div>Strength:</div>
+                  <div className="relative bg-neutral-300 h-3 w-full rounded overflow-hidden border border-neutral-300">
+                    <div className="w-full h-full absolute top-0 left-0 flex justify-evenly">
+                      {[...Array(4)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-0.5 h-full bg-neutral-200"
+                        ></div>
+                      ))}
+                    </div>
+                    <div
+                      className={cn(
+                        "h-full duration-500",
+                        statusLvl === 0 && "bg-purple-500 w-1/5",
+                        statusLvl === 1 && "bg-red-500 w-2/5",
+                        statusLvl === 2 && "bg-orange-500 w-3/5",
+                        statusLvl === 3 && "bg-yellow-500 w-4/5",
+                        statusLvl === 4 && "bg-green-500 w-full"
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+            </CardHeader>
+          </Card>
+        )}
+      </div>
+      <footer className="absolute bottom-0 left-0 flex items-center p-4 w-full space-x-4">
+        <div>
+          Made By{" "}
+          <a className="underline" href="https://www.ahmadsandid.com/">
+            Ahmad Sandid
           </a>
         </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
+        <div className="w-0.5 h-6 bg-white rounded-full" />
+        <div>
+          Source Data from{" "}
+          <a
+            className="underline"
+            href="https://www.hivesystems.io/password-table"
+          >
+            hivesystems
+          </a>
+        </div>
+      </footer>
     </main>
-  )
+  );
 }
